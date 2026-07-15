@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KaraokeHub — Host</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="dash">
+    <div class="dash-main">
+      <button id="toggleSidebar" class="sidebar-toggle" title="Toggle sidebar">☰</button>
+      <div id="mediaContainer" class="dash-player">
+        <div id="playerAudio" style="display:none;">
+          <div id="albumArt" class="album-art-default"></div>
+          <audio id="audioPlayer" style="width:100%;" controls autoplay></audio>
+        </div>
+        <div id="playerVideo" style="display:none;">
+          <video id="videoPlayer" style="width:100%; height:100%; object-fit:contain;" controls autoplay playsinline></video>
+        </div>
+        <div id="playerYoutube" style="display:none;">
+          <div style="position:relative; padding-bottom:56.25%; height:0; border-radius:12px; overflow:hidden;">
+            <iframe id="ytPlayer" style="position:absolute; top:0; left:0; width:100%; height:100%;" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+          </div>
+        </div>
+      </div>
+      <div id="idleOverlay" class="dash-idle">
+        <div class="brand" style="justify-content:center; margin-bottom:0;">
+          <h1 style="margin:0; font-size:32px;">Karaoke<span class="bulb">Hub</span></h1>
+        </div>
+        <p style="color:var(--muted); margin-top:12px;">Nothing playing yet — guests can join and add songs</p>
+      </div>
+    </div>
+
+    <div class="dash-sidebar">
+      <div class="sidebar-section">
+        <div class="ticket" style="padding:10px 14px;">
+          <div>
+            <div class="label" style="font-size:10px;">Room</div>
+            <div class="code" style="font-size:24px; letter-spacing:4px;">{{ code }}</div>
+          </div>
+          <div class="spotlight-ring" style="padding:6px; border-radius:10px;">
+            <img src="data:image/png;base64,{{ qr_b64 }}" alt="QR" style="display:block; border-radius:6px; width:80px; height:80px; background:#fff; padding:4px;">
+          </div>
+        </div>
+        <p class="hint" style="font-size:11px; word-break:break-all;">{{ join_url }}</p>
+      </div>
+
+      <div class="sidebar-section" id="nowPlayingBar">
+        <div id="nowPlayingInfo" class="np-info-empty">Nothing playing</div>
+      </div>
+
+      <div class="sidebar-section" style="border-top:1px solid var(--line);">
+        <input type="text" id="hostSearch" placeholder="Search songs…" style="font-size:13px; padding:10px 12px;">
+        <div id="hostSearchResults" style="max-height:150px; overflow-y:auto; margin-top:4px;"></div>
+      </div>
+
+      <div class="sidebar-section" style="flex:1; display:flex; flex-direction:column; min-height:0;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+          <h2 style="margin:0; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:1px;">Set list</h2>
+          <button class="btn-ghost" id="playNextBtn" style="font-size:12px;">▶ Skip</button>
+        </div>
+        <div id="queueList" class="queue-scroll" style="flex:1; overflow-y:auto;">No songs queued yet</div>
+      </div>
+
+      <div class="sidebar-section" style="border-top:1px solid var(--line); padding-top:10px;">
+        <button class="btn btn-secondary" id="browseBtn" style="font-size:13px; padding:10px;">Browse folder with songs</button>
+        <div id="folderBrowser" style="display:none; margin-top:8px;"></div>
+        <div id="scanStatus" style="margin-top:6px; font-size:12px; color:var(--muted);"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script>const CODE = "{{ code }}";</script>
+  <script src="{{ url_for('static', filename='js/host.js') }}"></script>
+</body>
+</html>

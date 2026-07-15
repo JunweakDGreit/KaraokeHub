@@ -1,0 +1,7 @@
+node_modules/
+venv/
+*.db
+__pycache__/
+*.pyc
+stdout*.txt
+stderr*.txt

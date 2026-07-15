@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KaraokeHub</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <div class="brand">
+      <h1 style="margin:0; font-size:26px;">Karaoke<span class="bulb">Hub</span></h1>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0; font-size:16px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px;">Start a night</h2>
+      <button class="btn btn-primary" id="createBtn">Create a room</button>
+      <p class="hint">Opens the host screen — put this on the TV or your laptop.</p>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0; font-size:16px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px;">Join a room</h2>
+      <input type="text" id="codeInput" placeholder="Enter 4-digit code" inputmode="numeric" maxlength="4" style="margin-bottom:12px;">
+      <button class="btn btn-secondary" id="joinBtn">Join</button>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('createBtn').addEventListener('click', async () => {
+      const res = await fetch('/api/rooms', { method: 'POST' });
+      const data = await res.json();
+      window.location.href = `/host/${data.code}`;
+    });
+
+    document.getElementById('joinBtn').addEventListener('click', () => {
+      const code = document.getElementById('codeInput').value.trim();
+      if (code.length === 4) window.location.href = `/join/${code}`;
+    });
+    document.getElementById('codeInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('joinBtn').click();
+    });
+  </script>
+</body>
+</html>

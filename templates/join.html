@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KaraokeHub — Join</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <div class="brand">
+      <h1 style="margin:0; font-size:22px;">Karaoke<span class="bulb">Hub</span></h1>
+    </div>
+
+    {% if room_missing %}
+    <div class="card">
+      <p>Room <strong>{{ code }}</strong> wasn't found — it may have expired.</p>
+      <a href="/" class="btn btn-secondary" style="text-decoration:none;">Back to start</a>
+    </div>
+    {% else %}
+    <div class="card">
+      <div class="ticket" style="padding:14px 20px;">
+        <div>
+          <div class="label">You're in room</div>
+          <div class="code" style="font-size:28px;">{{ code }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="search">Search</button>
+        <button class="tab-btn" data-tab="browse">Browse</button>
+      </div>
+      <div id="tab-search" class="tab-content active">
+        <input type="text" id="searchInput" placeholder="Search a song or artist…" style="margin-bottom:12px;">
+        <div id="results"></div>
+      </div>
+      <div id="tab-browse" class="tab-content">
+        <div id="browseList" class="empty-state">Loading library…</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0; font-size:14px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px;">Set list</h2>
+      <div id="queueList" class="empty-state">No songs queued yet — search above to add one.</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script>
+    const CODE = "{{ code }}";
+  </script>
+  <script src="{{ url_for('static', filename='js/join.js') }}"></script>
+</body>
+</html>

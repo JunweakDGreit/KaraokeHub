@@ -6,15 +6,89 @@ socket.on('connect', () => {
 
 socket.on('queue_update', ({ queue }) => renderQueue(queue));
 socket.on('now_playing_update', ({ now_playing }) => playMedia(now_playing));
+socket.on('playback_update', ({ paused }) => {
+  const media = document.getElementById('videoPlayer');
+  if (!media.src) return;
+  if (paused && !media.paused) media.pause();
+  if (!paused && media.paused) media.play();
+});
 
-const VIDEO_EXT = {'.mp4':1, '.webm':1, '.mkv':1, '.avi':1, '.mov':1};
+let vocalReduction = false;
+let currentItem = null;
+let playbackMode = "karaoke";
+let wasPaused = false;
 
-function getMediaType(item) {
-  if (!item || !item.source) return null;
-  if (item.source === 'youtube') return 'youtube';
-  const ext = item.source_ref ? '.' + item.source_ref.split('.').pop().toLowerCase() : '';
-  return VIDEO_EXT[ext] ? 'video' : 'audio';
+// --- Audio processing (Web Audio API) ---
+let audioCtx = null;
+let acSource = null;
+let acSourceEl = null;
+let acGainLR = null;
+let acGainRL = null;
+
+try {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+} catch (e) {}
+
+document.addEventListener('click', () => {
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume().catch(() => {});
+  }
+});
+
+function teardownAudio() {
+  if (acSource) {
+    try { acSource.disconnect(); } catch (e) {}
+    acSource = null;
+    acSourceEl = null;
+  }
+  acGainLR = null;
+  acGainRL = null;
 }
+
+function setupAudio(mediaEl) {
+  teardownAudio();
+
+  if (!audioCtx) {
+    mediaEl.muted = false;
+    return;
+  }
+
+  try {
+    acSource = audioCtx.createMediaElementSource(mediaEl);
+    acSourceEl = mediaEl;
+    mediaEl.muted = true;
+
+    const splitter = audioCtx.createChannelSplitter(2);
+    const merger = audioCtx.createChannelMerger(2);
+
+    const gainLL = audioCtx.createGain(); gainLL.gain.value = 1;
+    const gainRR = audioCtx.createGain(); gainRR.gain.value = 1;
+    acGainLR = audioCtx.createGain();
+    acGainRL = audioCtx.createGain();
+    applyVocalState();
+
+    acSource.connect(splitter);
+
+    splitter.connect(gainLL, 0, 0); gainLL.connect(merger, 0, 0);
+    splitter.connect(acGainLR, 0, 0); acGainLR.connect(merger, 0, 1);
+    splitter.connect(acGainRL, 1, 0); acGainRL.connect(merger, 0, 0);
+    splitter.connect(gainRR, 1, 0); gainRR.connect(merger, 0, 1);
+
+    merger.connect(audioCtx.destination);
+  } catch (e) {
+    console.warn('AudioContext setup failed, falling back to native audio:', e);
+    mediaEl.muted = false;
+    teardownAudio();
+  }
+}
+
+function applyVocalState() {
+  const val = vocalReduction ? -1 : 0;
+  if (acGainLR) acGainLR.gain.value = val;
+  if (acGainRL) acGainRL.gain.value = val;
+}
+
+
 
 function playMedia(item) {
   const container = document.getElementById('mediaContainer');
@@ -28,20 +102,24 @@ function playMedia(item) {
   const info = document.getElementById('nowPlayingInfo');
 
   [audioDiv, videoDiv, ytDiv].forEach(el => el.style.display = 'none');
-  audioEl.pause(); audioEl.src = '';
-  videoEl.pause(); videoEl.src = '';
+  audioEl.pause(); audioEl.removeAttribute('src');
+  videoEl.pause(); videoEl.removeAttribute('src');
   ytEl.src = '';
 
   if (!item) {
-    container.style.display = 'none';
-    idle.style.display = 'flex';
+    currentItem = null;
+    container.classList.remove('active');
+    idle.classList.add('active');
     info.className = 'np-info-empty';
     info.textContent = 'Nothing playing';
+    checkIdleState();
     return;
   }
 
-  idle.style.display = 'none';
-  container.style.display = 'flex';
+  currentItem = item;
+  idle.classList.remove('active');
+  container.classList.add('active');
+  checkIdleState();
 
   info.className = 'now-playing';
   info.innerHTML = `
@@ -52,24 +130,21 @@ function playMedia(item) {
     </div>
   `;
 
-  const type = getMediaType(item);
+  const mediaUrl = item.media_url || (
+    item.source === 'local' ? `/api/media?path=${encodeURIComponent(item.source_ref)}` :
+    item.source === 'youtube' ? `/api/stream/yt/${item.source_ref}` :
+    ''
+  );
 
-  if (type === 'youtube' && item.media_url) {
-    ytDiv.style.display = 'block';
-    ytEl.src = item.media_url;
-    return;
-  }
-
-  if (type === 'video' && item.media_url) {
-    videoDiv.style.display = 'flex';
-    videoEl.src = item.media_url;
-    videoEl.play().catch(() => {});
-    return;
-  }
-
-  audioDiv.style.display = 'block';
-  audioEl.src = item.media_url;
-  audioEl.play().catch(() => {});
+  videoDiv.style.display = 'flex';
+  videoEl.src = mediaUrl;
+  videoEl.muted = true;
+  wasPaused = false;
+  videoEl.onplay = () => {
+    if (!acSource) videoEl.muted = false;
+    videoEl.onplay = null;
+  };
+  videoEl.play().catch(() => {});
 }
 
 function escapeHtml(str) {
@@ -84,24 +159,41 @@ let hostSearchTimer;
 hostSearch.addEventListener('input', () => {
   clearTimeout(hostSearchTimer);
   const q = hostSearch.value.trim();
-  if (!q) { document.getElementById('hostSearchResults').innerHTML = ''; return; }
+  document.getElementById('suggestions').innerHTML = '';
+  if (!q) {
+    document.getElementById('hostSearchResults').innerHTML = '';
+    checkIdleState();
+    return;
+  }
   hostSearchTimer = setTimeout(() => runHostSearch(q), 300);
 });
 
-async function runHostSearch(q) {
-  const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+const idleSearch = document.getElementById('idleSearch');
+let idleSearchTimer;
+idleSearch.addEventListener('input', () => {
+  clearTimeout(idleSearchTimer);
+  const q = idleSearch.value.trim();
+  if (!q) {
+    document.getElementById('idleSearchResults').innerHTML = '';
+    return;
+  }
+  idleSearchTimer = setTimeout(() => runHostSearch(q, 'idleSearchResults'), 300);
+});
+
+async function runHostSearch(q, targetId) {
+  const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&mode=${playbackMode}`);
   const data = await res.json();
-  renderHostResults(data.results || []);
+  renderHostResults(data.results || [], targetId);
 }
 
-function renderHostResults(results) {
-  const el = document.getElementById('hostSearchResults');
+function renderHostResults(results, targetId) {
+  const el = document.getElementById(targetId || 'hostSearchResults');
   if (!results.length) {
     el.innerHTML = '<div class="empty-state" style="padding:8px; font-size:12px;">No matches</div>';
     return;
   }
-  el.innerHTML = results.map(r => `
-    <div class="host-result-row">
+  el.innerHTML = results.map((r, i) => `
+    <div class="host-result-row" style="animation-delay:${i * 30}ms;">
       <div class="host-result-info">
         <div class="host-result-title">${escapeHtml(r.title)}</div>
         <div class="host-result-artist">${escapeHtml(r.artist || '')}</div>
@@ -117,115 +209,333 @@ async function hostAddToQueue(song) {
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({...song, requested_by: 'Host'})
   });
-  hostSearch.value = '';
-  document.getElementById('hostSearchResults').innerHTML = '';
 }
 
 // --- Queue ---
+let queueItems = [];
+
 function renderQueue(queue) {
+  queueItems = queue;
   const el = document.getElementById('queueList');
   if (!queue.length) {
     el.innerHTML = '<div class="empty-state" style="padding:20px 0;">No songs queued yet</div>';
-    return;
-  }
-  el.innerHTML = queue.map((item, i) => `
-    <div class="setlist-item" style="padding:8px 4px;">
-      <div class="setlist-num" style="font-size:12px; width:18px;">${i + 1}</div>
-      <div class="setlist-info">
-        <div class="setlist-title" style="font-size:13px;">${escapeHtml(item.title)}</div>
-        <div class="setlist-meta" style="font-size:11px;">${escapeHtml(item.artist || '')} &middot; ${item.requested_by}</div>
+  } else {
+    el.innerHTML = queue.map((item, i) => `
+      <div class="setlist-item" draggable="true"
+           ondragstart="handleDragStart(event, ${i})"
+           ondragend="handleDragEnd(event)"
+           ondragover="handleDragOver(event)"
+           ondragleave="handleDragLeave(event)"
+           ondrop="handleDrop(event, ${i})"
+           style="padding:8px 4px; animation-delay:${i * 40}ms;">
+        <div class="setlist-num" style="font-size:12px; width:18px;">${i + 1}</div>
+        <div class="setlist-info">
+          <div class="setlist-title" style="font-size:13px;">${escapeHtml(item.title)}</div>
+          <div class="setlist-meta" style="font-size:11px;">${escapeHtml(item.artist || '')} &middot; ${item.requested_by}</div>
+        </div>
+        <button class="remove-btn" style="font-size:14px;" onclick="removeItem(${item.item_id})">✕</button>
       </div>
-      <button class="remove-btn" style="font-size:14px;" onclick="removeItem(${item.item_id})">✕</button>
-    </div>
-  `).join('');
+    `).join('');
+  }
+  checkIdleState();
 }
 
 async function removeItem(itemId) {
   await fetch(`/api/rooms/${CODE}/queue/${itemId}`, { method: 'DELETE' });
 }
 
-// --- Auto-advance on media end ---
-['audioPlayer', 'videoPlayer'].forEach(id => {
-  document.getElementById(id).addEventListener('ended', async () => {
-    await fetch(`/api/rooms/${CODE}/play_next`, { method: 'POST' });
+let dragSourceIdx = null;
+
+function handleDragStart(e, idx) {
+  dragSourceIdx = idx;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.setlist-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+  dragSourceIdx = null;
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.classList.add('drag-over');
+}
+
+function handleDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+
+async function handleDrop(e, toIdx) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if (dragSourceIdx === null || dragSourceIdx === toIdx) return;
+  await fetch(`/api/rooms/${CODE}/queue/reorder`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from_index: dragSourceIdx, to_index: toIdx })
   });
+  dragSourceIdx = null;
+}
+
+function checkIdleState() {
+  const sidebar = document.querySelector('.dash-sidebar');
+  const idle = !currentItem && !queueItems.length;
+  if (idle) {
+    sidebar.classList.remove('collapsed');
+    fetchSuggestions();
+  } else {
+    document.getElementById('suggestions').innerHTML = '';
+  }
+  document.getElementById('modePills').classList.toggle('hidden', idle);
+  document.getElementById('hostSearch').classList.toggle('sink', idle);
+}
+
+async function fetchSuggestions() {
+  const el = document.getElementById('suggestions');
+  el.innerHTML = '<div class="empty-state" style="padding:8px; font-size:12px;">Loading suggestions…</div>';
+  try {
+    const res = await fetch('/api/top?limit=8');
+    const data = await res.json();
+    renderSuggestions(data.results || []);
+  } catch (e) {
+    el.innerHTML = '';
+  }
+}
+
+function renderSuggestions(results) {
+  const el = document.getElementById('suggestions');
+  if (!results.length) {
+    el.innerHTML = '<div class="empty-state" style="padding:8px; font-size:12px;">Play some songs to get suggestions</div>';
+    return;
+  }
+  el.innerHTML = results.map((r, i) => `
+    <div class="host-result-row" style="animation-delay:${i * 40}ms;">
+      <div class="host-result-info">
+        <div class="host-result-title">${escapeHtml(r.title)}</div>
+        <div class="host-result-artist">${escapeHtml(r.artist || '')} &middot; ${r.play_count || 0} plays</div>
+      </div>
+      <button class="host-add-btn" onclick='hostAddSuggestion(${JSON.stringify(r).replace(/'/g, "&#39;")})'>+</button>
+    </div>
+  `).join('');
+}
+
+async function hostAddSuggestion(song) {
+  await fetch(`/api/rooms/${CODE}/queue`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({...song, requested_by: 'Host'})
+  });
+}
+
+// --- Auto-advance on media end ---
+document.getElementById('videoPlayer').addEventListener('ended', async () => {
+  await fetch(`/api/rooms/${CODE}/play_next`, { method: 'POST' });
 });
 
 document.getElementById('playNextBtn').addEventListener('click', async () => {
   await fetch(`/api/rooms/${CODE}/play_next`, { method: 'POST' });
 });
 
-// --- Folder browser ---
-let currentFolder = '';
+// --- Play / Pause toggle ---
+const playPauseBtn = document.getElementById('playPauseBtn');
+
+playPauseBtn.addEventListener('click', () => {
+  const media = document.getElementById('videoPlayer');
+  if (!media.src) return;
+  if (media.paused) {
+    media.play();
+  } else {
+    media.pause();
+  }
+  fetch(`/api/rooms/${CODE}/playpause`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paused: media.paused })
+  }).catch(() => {});
+});
+
+function updatePlayPauseBtn(isPaused) {
+  playPauseBtn.innerHTML = isPaused ? '▶ Play' : '⏸ Pause';
+  const overlay = document.getElementById('pauseOverlay');
+  const playAnim = document.getElementById('playAnim');
+  if (isPaused) {
+    wasPaused = true;
+    playAnim.classList.remove('pop');
+    overlay.classList.add('active');
+  } else {
+    overlay.classList.remove('active');
+    if (wasPaused) {
+      playAnim.classList.remove('pop');
+      void playAnim.offsetWidth;
+      playAnim.classList.add('pop');
+    }
+    wasPaused = false;
+  }
+}
+
+['videoPlayer'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('play', () => updatePlayPauseBtn(false));
+  el.addEventListener('pause', () => updatePlayPauseBtn(true));
+  el.addEventListener('ended', () => updatePlayPauseBtn(true));
+});
+
+document.getElementById('pauseOverlay').addEventListener('click', () => {
+  const media = document.getElementById('videoPlayer');
+  if (media.src && media.paused) {
+    media.play().catch(() => {});
+  }
+});
+
+// --- Vocal reduction toggle ---
+const vocalToggle = document.getElementById('vocalToggle');
+
+vocalToggle.addEventListener('click', async () => {
+  const media = document.getElementById('videoPlayer');
+  if (!media.src) return;
+
+  if (audioCtx && audioCtx.state === 'suspended') {
+    await audioCtx.resume();
+  }
+
+  vocalReduction = !vocalReduction;
+  updateVocalToggle();
+
+  if (!acSource || acSourceEl !== media) {
+    setupAudio(media);
+  }
+
+  applyVocalState();
+});
+
+function updateVocalToggle() {
+  vocalToggle.title = vocalReduction ? 'Voice: Off' : 'Voice: On';
+  vocalToggle.classList.toggle('btn-voice-active', vocalReduction);
+  vocalToggle.style.display = playbackMode === 'karaoke' ? 'none' : 'flex';
+}
+
+// --- Playback mode selector ---
+document.querySelectorAll('.mode-pill').forEach(pill => {
+  pill.addEventListener('click', function () {
+    setPlaybackMode(this.dataset.mode);
+  });
+});
+
+function setPlaybackMode(mode) {
+  playbackMode = mode;
+  document.querySelectorAll('.mode-pill').forEach(p => p.classList.toggle('active', p.dataset.mode === mode));
+  updateVocalToggle();
+  const q = hostSearch.value.trim();
+  if (q) runHostSearch(q);
+  const idleQ = document.getElementById('idleSearch').value.trim();
+  if (idleQ) runHostSearch(idleQ, 'idleSearchResults');
+}
+
+// --- Keyboard shortcuts ---
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  const video = document.getElementById('videoPlayer');
+  const media = video && video.src ? video : null;
+
+  switch (e.code) {
+    case 'Space':
+      e.preventDefault();
+      if (media) media.paused ? media.play() : media.pause();
+      break;
+    case 'ArrowLeft':
+      if (media) media.currentTime = Math.max(0, media.currentTime - 5);
+      break;
+    case 'ArrowRight':
+      if (media) media.currentTime = Math.min(media.duration || 0, media.currentTime + 5);
+      break;
+    case 'KeyN':
+      document.getElementById('playNextBtn').click();
+      break;
+    case 'KeyM':
+      if (media) media.muted = !media.muted;
+      break;
+    case 'KeyF':
+      e.preventDefault();
+      if (media && media.tagName === 'VIDEO') {
+        media.requestFullscreen ? media.requestFullscreen() :
+        media.webkitRequestFullscreen ? media.webkitRequestFullscreen() : null;
+      }
+      break;
+  }
+});
+
+// --- Folder browser (one-level pick + instant scan) ---
+let drivesCache = [];
 
 document.getElementById('browseBtn').addEventListener('click', async () => {
   const fb = document.getElementById('folderBrowser');
   if (fb.style.display === 'block') { fb.style.display = 'none'; return; }
   fb.style.display = 'block';
-  fb.innerHTML = '<div class="empty-state" style="padding:12px;">Loading drives&hellip;</div>';
-  const res = await fetch('/api/fs/drives');
-  const data = await res.json();
-  renderDriveList(data.drives || []);
+  fb.innerHTML = '<div class="empty-state" style="padding:6px;font-size:12px;">Loading drives…</div>';
+  if (!drivesCache.length) {
+    const res = await fetch('/api/fs/drives');
+    const data = await res.json();
+    drivesCache = data.drives || [];
+  }
+  showDrives();
 });
 
-function renderDriveList(drives) {
+function showDrives() {
   const fb = document.getElementById('folderBrowser');
-  fb.innerHTML = '<div class="folder-browser-header">Select a drive:</div>' +
-    drives.map(d => `<div class="folder-row" data-path="${d}" style="font-size:13px;">&#128193; ${d}</div>`).join('');
+  fb.innerHTML = '<div class="folder-browser-header">Pick a drive:</div>' +
+    drivesCache.map(d => `<div class="folder-row" data-path="${d}">&#128193; ${d}</div>`).join('');
   fb.querySelectorAll('.folder-row').forEach(el => {
-    el.addEventListener('click', () => loadFolder(el.dataset.path));
+    el.addEventListener('click', () => showSubfolders(el.dataset.path));
   });
 }
 
-async function loadFolder(path) {
-  currentFolder = path;
+async function showSubfolders(drivePath) {
   const fb = document.getElementById('folderBrowser');
-  const st = document.getElementById('scanStatus');
-  st.textContent = '';
-  fb.innerHTML = '<div class="empty-state" style="padding:12px;">Loading&hellip;</div>';
-  const res = await fetch('/api/fs/list?path=' + encodeURIComponent(path));
+  fb.innerHTML = '<div class="empty-state" style="padding:6px;font-size:12px;">Loading…</div>';
+  const res = await fetch('/api/fs/list?path=' + encodeURIComponent(drivePath));
   const data = await res.json();
-  if (data.error) { fb.innerHTML = `<div class="empty-state">${data.error}</div>`; return; }
-  renderFolder(data);
+  if (data.error) {
+    fb.innerHTML = `<div class="empty-state" style="font-size:12px;">${data.error}</div>`;
+    return;
+  }
+  let html = `<div class="folder-row back-drives">&#128281; ${drivePath} &mdash; back to drives</div>`;
+  if (!data.entries.length) {
+    html += '<div class="empty-state" style="padding:6px;font-size:12px;">No subfolders</div>';
+  } else {
+    html += '<div class="folder-entries">' +
+      data.entries.map(e => `<div class="folder-row" data-path="${e.path}">&#128193; ${e.name}</div>`).join('') +
+      '</div>';
+  }
+  fb.innerHTML = html;
+  fb.querySelector('.back-drives').addEventListener('click', showDrives);
+  fb.querySelectorAll('.folder-row:not(.back-drives)').forEach(el => {
+    el.addEventListener('click', async () => scanFolder(el.dataset.path, el.textContent.trim()));
+  });
 }
 
-function renderFolder(data) {
+async function scanFolder(path, name) {
   const fb = document.getElementById('folderBrowser');
-  const parts = data.current.split('\\').filter(Boolean);
-  let bc = '<span class="folder-crumb" data-path="">&#128193;</span>';
-  let acc = '';
-  parts.forEach(p => {
-    acc += '\\' + p;
-    bc += ' <span class="folder-crumb sep">&#8250;</span> <span class="folder-crumb" data-path="' + acc + '\\">' + p + '</span>';
-  });
-  let html = '<div class="folder-breadcrumb">' + bc + '</div>';
-  html += '<div class="folder-entries" style="max-height:160px;">';
-  if (!data.entries.length) {
-    html += '<div class="empty-state" style="padding:12px;">No subfolders</div>';
-  } else {
-    data.entries.forEach(e => {
-      html += '<div class="folder-row" data-path="' + e.path + '" style="font-size:13px;">&#128193; ' + e.name + '</div>';
+  fb.innerHTML = '<div class="empty-state" style="padding:6px;font-size:12px;">Scanning…</div>';
+  try {
+    const r = await fetch('/api/library/scan-path', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({path})
     });
+    const d = await r.json();
+    if (d.error) {
+      fb.innerHTML = `<div class="empty-state" style="font-size:12px;">Error: ${d.error}</div>`;
+    } else {
+      fb.innerHTML = `<div class="empty-state" style="padding:6px;font-size:12px;color:var(--gold);">Found ${d.indexed_files} songs in ${escapeHtml(name)}</div>
+        <div class="folder-row back-drives" style="text-align:center;">&#128281; Back to drives</div>`;
+      fb.querySelector('.back-drives').addEventListener('click', showDrives);
+    }
+  } catch(e) {
+    fb.innerHTML = '<div class="empty-state" style="font-size:12px;">Scan failed</div>';
   }
-  html += '</div>';
-  html += '<button class="btn btn-primary scan-folder-btn" style="padding:10px; font-size:13px;">Scan this folder</button>';
-  fb.innerHTML = html;
-
-  fb.querySelectorAll('.folder-row').forEach(el => el.addEventListener('click', () => loadFolder(el.dataset.path)));
-  fb.querySelectorAll('.folder-crumb').forEach(el => el.addEventListener('click', () => loadFolder(el.dataset.path || '')));
-  fb.querySelector('.scan-folder-btn').addEventListener('click', async () => {
-    const st = document.getElementById('scanStatus');
-    st.textContent = 'Scanning&hellip;';
-    try {
-      const r = await fetch('/api/library/scan-path', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({path: currentFolder})
-      });
-      const d = await r.json();
-      st.textContent = d.error ? 'Error: ' + d.error : `Found ${d.indexed_files} new song(s).`;
-    } catch(e) { st.textContent = 'Error scanning folder.'; }
-  });
 }
 
 // --- Sidebar toggle ---
@@ -234,6 +544,7 @@ document.getElementById('toggleSidebar').addEventListener('click', () => {
 });
 
 // initial load
+updateVocalToggle();
 fetch(`/api/rooms/${CODE}`).then(r => r.json()).then(data => {
   if (data.queue) renderQueue(data.queue);
   if (data.now_playing !== undefined) playMedia(data.now_playing);

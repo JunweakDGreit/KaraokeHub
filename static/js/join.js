@@ -10,6 +10,8 @@ socket.on('connect', () => {
 });
 
 socket.on('queue_update', ({ queue }) => renderQueue(queue));
+socket.on('now_playing_update', ({ now_playing }) => updateNowPlaying(now_playing));
+socket.on('playback_update', ({ paused }) => updatePlayPauseBtn(paused));
 
 // --- Tab switching ---
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -25,6 +27,17 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 // --- Search ---
 const searchInput = document.getElementById('searchInput');
 let debounceTimer;
+let searchMode = "karaoke";
+
+document.querySelectorAll('#joinModePills .mode-pill').forEach(pill => {
+  pill.addEventListener('click', function () {
+    searchMode = this.dataset.mode;
+    document.querySelectorAll('#joinModePills .mode-pill').forEach(p => p.classList.toggle('active', p.dataset.mode === searchMode));
+    const q = searchInput.value.trim();
+    if (q) runSearch(q);
+  });
+});
+
 searchInput.addEventListener('input', () => {
   clearTimeout(debounceTimer);
   const q = searchInput.value.trim();
@@ -33,7 +46,7 @@ searchInput.addEventListener('input', () => {
 });
 
 async function runSearch(q) {
-  const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+  const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&mode=${searchMode}`);
   const data = await res.json();
   renderResults(data.results || []);
 }
@@ -61,8 +74,6 @@ async function addToQueue(song) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...song, requested_by: myName })
   });
-  searchInput.value = '';
-  document.getElementById('results').innerHTML = '';
 }
 
 // --- Browse library ---
@@ -116,7 +127,12 @@ function renderQueue(queue) {
   }
   el.className = '';
   el.innerHTML = queue.map((item, i) => `
-    <div class="setlist-item">
+    <div class="setlist-item" draggable="true"
+         ondragstart="handleDragStart(event, ${i})"
+         ondragend="handleDragEnd(event)"
+         ondragover="handleDragOver(event)"
+         ondragleave="handleDragLeave(event)"
+         ondrop="handleDrop(event, ${i})">
       <div class="setlist-num">${i + 1}</div>
       <div class="setlist-info">
         <div class="setlist-title">${escapeHtml(item.title)}</div>
@@ -132,9 +148,83 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+let dragSourceIdx = null;
+
+function handleDragStart(e, idx) {
+  dragSourceIdx = idx;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.setlist-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+  dragSourceIdx = null;
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.classList.add('drag-over');
+}
+
+function handleDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+
+async function handleDrop(e, toIdx) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if (dragSourceIdx === null || dragSourceIdx === toIdx) return;
+  await fetch(`/api/rooms/${CODE}/queue/reorder`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from_index: dragSourceIdx, to_index: toIdx })
+  });
+  dragSourceIdx = null;
+}
+
 fetch(`/api/rooms/${CODE}`).then(r => r.json()).then(data => {
   if (data.queue) renderQueue(data.queue);
+  if (data.now_playing !== undefined) updateNowPlaying(data.now_playing);
 });
 
 // load browse on first tab click
 loadBrowse();
+
+// --- Now Playing + controls ---
+function updateNowPlaying(item) {
+  const info = document.getElementById('joinNowPlayingInfo');
+  const controls = document.getElementById('guestControls');
+  if (!item) {
+    info.className = 'empty-state';
+    info.textContent = 'Nothing playing';
+    controls.style.display = 'none';
+    return;
+  }
+  info.className = '';
+  info.innerHTML = `
+    <div class="result-title" style="font-size:15px;">${escapeHtml(item.title)}</div>
+    <div class="result-artist" style="font-size:12px;">${escapeHtml(item.artist || '')} &middot; ${escapeHtml(item.requested_by || '')}</div>
+  `;
+  controls.style.display = 'flex';
+}
+
+function updatePlayPauseBtn(paused) {
+  const btn = document.getElementById('guestPlayPause');
+  btn.innerHTML = paused ? '▶ Play' : '⏸ Pause';
+}
+
+document.getElementById('guestPlayPause').addEventListener('click', () => {
+  const btn = document.getElementById('guestPlayPause');
+  const isPaused = btn.innerHTML.includes('Play');
+  fetch(`/api/rooms/${CODE}/playpause`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paused: !isPaused })
+  }).catch(() => {});
+});
+
+document.getElementById('guestNext').addEventListener('click', () => {
+  fetch(`/api/rooms/${CODE}/play_next`, { method: 'POST' }).catch(() => {});
+});

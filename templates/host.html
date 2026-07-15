@@ -10,25 +10,39 @@
   <div class="dash">
     <div class="dash-main">
       <button id="toggleSidebar" class="sidebar-toggle" title="Toggle sidebar">☰</button>
-      <div id="mediaContainer" class="dash-player">
+            <div id="mediaContainer" class="dash-player">
+        <div id="pauseOverlay" class="pause-overlay">
+          <div class="pause-icon">⏸</div>
+          <div id="playAnim" class="play-anim">▶</div>
+        </div>
         <div id="playerAudio" style="display:none;">
+
+
+
+
           <div id="albumArt" class="album-art-default"></div>
           <audio id="audioPlayer" style="width:100%;" controls autoplay></audio>
         </div>
         <div id="playerVideo" style="display:none;">
-          <video id="videoPlayer" style="width:100%; height:100%; object-fit:contain;" controls autoplay playsinline></video>
+          <video id="videoPlayer" style="width:100%; height:100%; object-fit:contain;" autoplay playsinline muted controlsList="nodownload" oncontextmenu="return false"></video>
         </div>
         <div id="playerYoutube" style="display:none;">
-          <div style="position:relative; padding-bottom:56.25%; height:0; border-radius:12px; overflow:hidden;">
-            <iframe id="ytPlayer" style="position:absolute; top:0; left:0; width:100%; height:100%;" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
-          </div>
+          <iframe id="ytPlayer" style="width:100%; height:100%; border:0;" allow="autoplay; encrypted-media" allowfullscreen></iframe>
         </div>
       </div>
-      <div id="idleOverlay" class="dash-idle">
+      <div id="idleOverlay" class="dash-idle active">
         <div class="brand" style="justify-content:center; margin-bottom:0;">
           <h1 style="margin:0; font-size:32px;">Karaoke<span class="bulb">Hub</span></h1>
         </div>
-        <p style="color:var(--muted); margin-top:12px;">Nothing playing yet — guests can join and add songs</p>
+        <div class="idle-search-container">
+          <div class="mode-pills" id="idleModePills" style="margin-bottom:10px;">
+            <button class="mode-pill active" data-mode="karaoke">🎭 Karaoke</button>
+            <button class="mode-pill" data-mode="mtv">🎤 MTV</button>
+            <button class="mode-pill" data-mode="lyrics">📄 Lyrics</button>
+          </div>
+          <input type="text" id="idleSearch" placeholder="Search songs…" autocomplete="off">
+          <div id="idleSearchResults" style="margin-top:8px; max-height:200px; overflow-y:auto; text-align:left;"></div>
+        </div>
       </div>
     </div>
 
@@ -43,28 +57,47 @@
             <img src="data:image/png;base64,{{ qr_b64 }}" alt="QR" style="display:block; border-radius:6px; width:80px; height:80px; background:#fff; padding:4px;">
           </div>
         </div>
-        <p class="hint" style="font-size:11px; word-break:break-all;">{{ join_url }}</p>
       </div>
 
       <div class="sidebar-section" id="nowPlayingBar">
         <div id="nowPlayingInfo" class="np-info-empty">Nothing playing</div>
+        <div class="host-controls" style="margin-top:8px;">
+          <button class="btn btn-secondary" id="playPauseBtn" style="flex:1; font-size:12px; padding:8px;">▶ Play</button>
+          <button class="btn btn-primary" id="playNextBtn" style="flex:1; font-size:12px; padding:8px;">⏭ Next</button>
+        </div>
+        <div class="host-controls" style="justify-content:center; margin-top:6px;">
+          <button class="btn btn-voice" id="vocalToggle" title="Voice: On" style="padding:8px;">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:22px;height:22px;display:block;">
+              <rect x="5" y="9" width="3" height="6" rx="1.5" fill="currentColor"/>
+              <rect x="10.5" y="5" width="3" height="14" rx="1.5" fill="currentColor"/>
+              <rect x="16" y="9" width="3" height="6" rx="1.5" fill="currentColor"/>
+              <path d="M3 7 C1 8.5, 1 15.5, 3 17" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+              <path d="M21 7 C23 8.5, 23 15.5, 21 17" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div class="sidebar-section" style="border-top:1px solid var(--line);">
+        <div class="mode-pills" id="modePills">
+          <button class="mode-pill active" data-mode="karaoke">🎭 Karaoke</button>
+          <button class="mode-pill" data-mode="mtv">🎤 MTV</button>
+          <button class="mode-pill" data-mode="lyrics">📄 Lyrics</button>
+        </div>
         <input type="text" id="hostSearch" placeholder="Search songs…" style="font-size:13px; padding:10px 12px;">
         <div id="hostSearchResults" style="max-height:150px; overflow-y:auto; margin-top:4px;"></div>
+        <div id="suggestions" style="max-height:180px; overflow-y:auto; margin-top:4px;"></div>
       </div>
 
       <div class="sidebar-section" style="flex:1; display:flex; flex-direction:column; min-height:0;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
           <h2 style="margin:0; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:1px;">Set list</h2>
-          <button class="btn-ghost" id="playNextBtn" style="font-size:12px;">▶ Skip</button>
         </div>
         <div id="queueList" class="queue-scroll" style="flex:1; overflow-y:auto;">No songs queued yet</div>
       </div>
 
-      <div class="sidebar-section" style="border-top:1px solid var(--line); padding-top:10px;">
-        <button class="btn btn-secondary" id="browseBtn" style="font-size:13px; padding:10px;">Browse folder with songs</button>
+      <div class="sidebar-section" style="border-top:1px solid var(--line); padding:8px 14px;">
+        <button class="btn btn-secondary" id="browseBtn" style="font-size:12px; padding:8px;">Browse folder with songs</button>
         <div id="folderBrowser" style="display:none; margin-top:8px;"></div>
         <div id="scanStatus" style="margin-top:6px; font-size:12px; color:var(--muted);"></div>
       </div>

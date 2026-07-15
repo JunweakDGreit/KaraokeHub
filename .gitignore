@@ -5,3 +5,4 @@ __pycache__/
 *.pyc
 stdout*.txt
 stderr*.txt
+bin/

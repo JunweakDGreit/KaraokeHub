@@ -33,8 +33,13 @@
         <button class="tab-btn" data-tab="browse">Browse</button>
       </div>
       <div id="tab-search" class="tab-content active">
+        <div class="mode-pills" id="joinModePills">
+          <button class="mode-pill active" data-mode="karaoke">🎭 Karaoke</button>
+          <button class="mode-pill" data-mode="mtv">🎤 MTV</button>
+          <button class="mode-pill" data-mode="lyrics">📄 Lyrics</button>
+        </div>
         <input type="text" id="searchInput" placeholder="Search a song or artist…" style="margin-bottom:12px;">
-        <div id="results"></div>
+        <div id="results" style="max-height:260px; overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--line) transparent;"></div>
       </div>
       <div id="tab-browse" class="tab-content">
         <div id="browseList" class="empty-state">Loading library…</div>
@@ -42,8 +47,17 @@
     </div>
 
     <div class="card">
+      <h2 style="margin-top:0; font-size:14px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px;">Now Playing</h2>
+      <div id="joinNowPlayingInfo" class="empty-state">Nothing playing</div>
+      <div class="guest-controls" id="guestControls" style="display:none; gap:8px; margin-top:10px;">
+        <button class="btn btn-secondary" id="guestPlayPause" style="flex:1; font-size:13px; padding:10px;">▶ Play</button>
+        <button class="btn btn-primary" id="guestNext" style="flex:1; font-size:13px; padding:10px;">⏭ Next</button>
+      </div>
+    </div>
+
+    <div class="card">
       <h2 style="margin-top:0; font-size:14px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px;">Set list</h2>
-      <div id="queueList" class="empty-state">No songs queued yet — search above to add one.</div>
+      <div id="queueList" class="empty-state">No songs queued yet — search or browse above to add one.</div>
     </div>
     {% endif %}
   </div>

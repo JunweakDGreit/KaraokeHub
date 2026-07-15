@@ -10,8 +10,8 @@ import sqlite3
 import random
 import string
 import subprocess
-import webbrowser
 import platform
+from urllib.parse import quote
 import mimetypes
 from pathlib import Path
 
@@ -20,7 +20,7 @@ import qrcode.image.svg
 from io import BytesIO
 import base64
 
-from flask import Flask, request, jsonify, render_template, send_from_directory
+from flask import Flask, request, jsonify, render_template, send_from_directory, send_file, redirect, Response
 from flask_socketio import SocketIO, join_room as socket_join_room, emit
 
 BASE_DIR = Path(__file__).parent
@@ -79,6 +79,10 @@ def init_db():
             filepath TEXT NOT NULL UNIQUE
         )"""
     )
+    try:
+        conn.execute("ALTER TABLE songs ADD COLUMN play_count INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
     conn.commit()
     conn.close()
 
@@ -152,10 +156,14 @@ def has_internet():
         return False
 
 
-def search_youtube(query: str, limit: int = 5):
+def search_youtube(query: str, limit: int = 5, suffix: str = ""):
     """Search YouTube via yt-dlp Python module. Returns [] if unavailable."""
     try:
         from yt_dlp import YoutubeDL
+
+        q = f"ytsearch{limit}:{query}"
+        if suffix:
+            q += f" {suffix}"
 
         ydl_opts = {
             "quiet": True,
@@ -164,7 +172,7 @@ def search_youtube(query: str, limit: int = 5):
             "skip_download": True,
         }
         with YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"ytsearch{limit}:{query} karaoke", download=False)
+            info = ydl.extract_info(q, download=False)
             results = []
             if info and "entries" in info:
                 for entry in info["entries"]:
@@ -319,6 +327,7 @@ def api_list_dir():
 @app.route("/api/search")
 def api_search():
     q = request.args.get("q", "").strip()
+    mode = request.args.get("mode", "mtv")
     if not q:
         return jsonify({"results": []})
 
@@ -330,8 +339,31 @@ def api_search():
 
     results = local_results
     if len(local_results) < 3 and has_internet():
-        results = results + search_youtube(q)
+        suffix = ""
+        if mode == "karaoke":
+            suffix = "karaoke"
+        elif mode == "lyrics":
+            suffix = "lyrics"
+        results = results + search_youtube(q, suffix=suffix)
 
+    return jsonify({"results": results})
+
+
+@app.route("/api/top")
+def api_top():
+    limit = request.args.get("limit", 10, type=int)
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT id, title, artist, filepath, play_count FROM songs WHERE play_count > 0 ORDER BY play_count DESC LIMIT ?",
+        (limit,)
+    ).fetchall()
+    conn.close()
+    results = [
+        {"id": r["id"], "title": r["title"], "artist": r["artist"],
+         "source": "local", "source_ref": r["filepath"], "play_count": r["play_count"]}
+        for r in rows
+    ]
     return jsonify({"results": results})
 
 
@@ -345,15 +377,24 @@ def advance_queue(room, code):
 
     item = room["queue"].pop(0)
     room["now_playing"] = item
+    room["paused"] = False
 
     if item["source"] == "local":
-        item["media_url"] = f"/api/media?path={item['source_ref']}"
+        item["media_url"] = f"/api/media?path={quote(item['source_ref'], safe='')}"
+        try:
+            c = sqlite3.connect(DB_PATH)
+            c.execute("UPDATE songs SET play_count = play_count + 1 WHERE filepath = ?", (item["source_ref"],))
+            c.commit()
+            c.close()
+        except Exception:
+            pass
     elif item["source"] == "youtube":
-        item["media_url"] = f"https://www.youtube.com/embed/{item['source_ref']}?autoplay=1&playsinline=1"
+        item["media_url"] = f"/api/yt/{item['source_ref']}"
 
     play_media(item)
     socketio.emit("queue_update", {"queue": room["queue"]}, to=code)
     socketio.emit("now_playing_update", {"now_playing": item}, to=code)
+    socketio.emit("playback_update", {"paused": False}, to=code)
     return item
 
 
@@ -373,6 +414,172 @@ def api_serve_media():
 
     mime, _ = mimetypes.guess_type(filepath)
     return send_file(filepath, mimetype=mime, conditional=True)
+
+
+@app.route("/api/yt/<vid>")
+def api_yt_stream(vid):
+    try:
+        from yt_dlp import YoutubeDL
+        ydl_opts = {"quiet": True, "no_warnings": True, "format": "best[ext=mp4][height<=720]/best[ext=mp4]/best"}
+        with YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"https://www.youtube.com/watch?v={vid}", download=False)
+            url = info.get("url")
+            if not url:
+                for fmt in info.get("formats", []):
+                    if fmt.get("acodec") != "none" and fmt.get("vcodec") != "none":
+                        url = fmt.get("url")
+                        if url: break
+            if url:
+                return redirect(url)
+    except Exception:
+        pass
+    return jsonify({"error": "stream unavailable"}), 500
+
+
+@app.route("/api/stream/yt/<vid>")
+def api_stream_yt(vid):
+    try:
+        from yt_dlp import YoutubeDL
+        ydl_opts = {"quiet": True, "no_warnings": True, "format": "best[height<=720]/best"}
+        with YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"https://www.youtube.com/watch?v={vid}", download=False)
+            url = info.get("url")
+            if not url:
+                for fmt in info.get("formats", []):
+                    if fmt.get("acodec") != "none" and fmt.get("vcodec") != "none":
+                        url = fmt.get("url")
+                        if url:
+                            break
+            if not url:
+                return jsonify({"error": "no stream URL"}), 500
+
+            cmd = [
+                FFMPEG, "-i", url,
+                "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
+                "-movflags", "frag_keyframe+empty_moov",
+                "-f", "mp4",
+                "pipe:1"
+            ]
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+
+            def generate():
+                try:
+                    while True:
+                        chunk = proc.stdout.read(8192)
+                        if not chunk:
+                            break
+                        yield chunk
+                except GeneratorExit:
+                    pass
+                finally:
+                    try:
+                        proc.kill()
+                        proc.wait()
+                    except Exception:
+                        pass
+
+            resp = Response(generate(), mimetype="video/mp4")
+            resp.headers["Content-Disposition"] = "inline"
+            return resp
+    except Exception:
+        return jsonify({"error": "stream unavailable"}), 500
+
+
+@app.route("/api/media/vocal")
+def api_vocal_media():
+    path = request.args.get("path", "")
+    if not path:
+        return jsonify({"error": "missing path"}), 400
+
+    if os.path.isabs(path):
+        filepath = path
+    else:
+        filepath = str(LIBRARY_DIR / path)
+
+    if not os.path.isfile(filepath):
+        return jsonify({"error": "file not found"}), 404
+
+    ext = Path(filepath).suffix.lower()
+    is_video = ext in {'.mp4', '.webm', '.mkv', '.avi', '.mov'}
+
+    return _stream_vocal_reduction(filepath, is_video=is_video)
+
+
+@app.route("/api/media/vocal/yt/<vid>")
+def api_vocal_yt(vid):
+    try:
+        from yt_dlp import YoutubeDL
+        ydl_opts = {"quiet": True, "no_warnings": True, "format": "best[height<=720]/best"}
+        with YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"https://www.youtube.com/watch?v={vid}", download=False)
+            url = info.get("url")
+            if not url:
+                for fmt in info.get("formats", []):
+                    if fmt.get("acodec") != "none" and fmt.get("vcodec") != "none":
+                        url = fmt.get("url")
+                        if url:
+                            break
+            if not url:
+                return jsonify({"error": "no stream URL"}), 500
+
+            return _stream_vocal_reduction(url, is_video=True)
+    except Exception as e:
+        return jsonify({"error": f"stream unavailable: {str(e)}"}), 500
+
+
+FFMPEG_BIN = os.path.join(os.path.dirname(__file__), "bin", "ffmpeg.exe")
+FFMPEG = FFMPEG_BIN if os.path.isfile(FFMPEG_BIN) else "ffmpeg"
+
+
+VOCAL_KILL = (
+    "pan=stereo|c0=c0-c1|c1=c1-c0,"
+    "equalizer=f=150:width_type=q:width=1:g=3,"
+    "equalizer=f=600:width_type=q:width=1:g=-4,"
+    "equalizer=f=1500:width_type=q:width=1.5:g=-8,"
+    "equalizer=f=4000:width_type=q:width=1:g=-5"
+)
+
+
+def _stream_vocal_reduction(input_src, is_video=True):
+    if is_video:
+        cmd = [
+            FFMPEG, "-i", input_src,
+            "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
+            "-af", VOCAL_KILL,
+            "-f", "mp4", "-movflags", "frag_keyframe+empty_moov",
+            "pipe:1"
+        ]
+        mimetype = "video/mp4"
+    else:
+        cmd = [
+            FFMPEG, "-i", input_src,
+            "-af", VOCAL_KILL,
+            "-f", "mp3",
+            "pipe:1"
+        ]
+        mimetype = "audio/mpeg"
+
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+
+    def generate():
+        try:
+            while True:
+                chunk = proc.stdout.read(8192)
+                if not chunk:
+                    break
+                yield chunk
+        except GeneratorExit:
+            pass
+        finally:
+            try:
+                proc.kill()
+                proc.wait()
+            except Exception:
+                pass
+
+    resp = Response(generate(), mimetype=mimetype)
+    resp.headers["Content-Disposition"] = "inline"
+    return resp
 
 
 @app.route("/api/rooms/<code>/queue", methods=["POST"])
@@ -411,6 +618,25 @@ def remove_from_queue(code, item_id):
     return jsonify({"ok": True})
 
 
+@app.route("/api/rooms/<code>/queue/reorder", methods=["POST"])
+def reorder_queue(code):
+    room = rooms.get(code)
+    if not room:
+        return jsonify({"error": "room not found"}), 404
+    data = request.get_json(force=True)
+    from_index = data.get("from_index")
+    to_index = data.get("to_index")
+    if from_index is None or to_index is None:
+        return jsonify({"error": "missing from_index/to_index"}), 400
+    q = room["queue"]
+    if not 0 <= from_index < len(q) or not 0 <= to_index < len(q):
+        return jsonify({"error": "invalid index"}), 400
+    item = q.pop(from_index)
+    q.insert(to_index, item)
+    socketio.emit("queue_update", {"queue": q}, to=code)
+    return jsonify({"ok": True})
+
+
 @app.route("/api/rooms/<code>/play_next", methods=["POST"])
 def play_next(code):
     room = rooms.get(code)
@@ -418,6 +644,18 @@ def play_next(code):
         return jsonify({"error": "room not found"}), 404
     item = advance_queue(room, code)
     return jsonify({"ok": True, "now_playing": item})
+
+
+@app.route("/api/rooms/<code>/playpause", methods=["POST"])
+def playpause(code):
+    room = rooms.get(code)
+    if not room:
+        return jsonify({"error": "room not found"}), 404
+    data = request.get_json(silent=True) or {}
+    paused = data.get("paused", False)
+    room["paused"] = paused
+    socketio.emit("playback_update", {"paused": paused}, to=code)
+    return jsonify({"ok": True})
 
 
 def play_media(item):
@@ -458,17 +696,19 @@ def on_join(data):
 
 
 if __name__ == "__main__":
-    import threading
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--browser", choices=["brave", "default"], default=None,
+                        help="Browser mode passed by launcher (handled externally)")
+    args = parser.parse_args()
 
     init_db()
     scan_library()
     ip = get_local_ip()
     print(f"\nKaraokeHub running.\n  On this laptop:  http://localhost:5000\n  On phones (same WiFi): http://{ip}:5000\n")
 
-    def open_browser():
-        import time as _t
-        _t.sleep(1.5)
-        webbrowser.open("http://localhost:5000")
+    browser_mode = args.browser or "none"
+    print(f"Browser mode: {browser_mode}")
 
-    threading.Thread(target=open_browser, daemon=True).start()
     socketio.run(app, host="0.0.0.0", port=5000, debug=False, allow_unsafe_werkzeug=True)

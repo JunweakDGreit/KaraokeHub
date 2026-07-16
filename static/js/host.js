@@ -251,19 +251,22 @@ function flyToQueue(btn, song) {
   const lastItem = ql.querySelector('.setlist-item:last-child');
   const destRect = lastItem ? lastItem.getBoundingClientRect() : dest;
   const destTop = lastItem ? destRect.bottom + 4 : destRect.top + 8;
-  const destLeft = lastItem ? destRect.left : destRect.left + 8;
+
+  const srcCenterX = srcRect.left - 10;
+  const sweepX = window.innerWidth - 40 - srcCenterX;
+  const arcY = (destTop - srcRect.top) * 0.4;
 
   const fly = document.createElement('div');
   fly.className = 'fly-clone';
   fly.innerHTML = `<div style="display:flex;align-items:center;gap:10px;"><div style="font-family:'Space Mono',monospace;color:var(--muted);font-size:12px;width:18px;flex-shrink:0;">#</div><div style="flex:1;min-width:0;"><div style="font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(song.title)}</div><div style="font-size:10px;color:var(--muted);">${escapeHtml(song.artist || '')}</div></div></div>`;
-  fly.style.left = (srcRect.left - 10) + 'px';
+  fly.style.left = srcCenterX + 'px';
   fly.style.top = srcRect.top + 'px';
   fly.style.width = '180px';
   document.body.appendChild(fly);
 
   requestAnimationFrame(() => {
-    fly.style.transform = `translate(${destLeft - (srcRect.left - 10)}px, ${destTop - srcRect.top}px) scale(0.85)`;
-    fly.style.opacity = '0.5';
+    fly.style.transform = `translate(${sweepX}px, ${arcY}px) scale(0.85)`;
+    fly.style.opacity = '0.4';
   });
 
   fly.addEventListener('transitionend', () => fly.remove(), { once: true });

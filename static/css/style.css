@@ -427,6 +427,20 @@ input[type="text"].sink {
 #searchInput {
   padding-right: 34px !important;
 }
+#hostSearchResults {
+  max-height: 150px;
+  overflow-y: auto;
+  margin-top: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+#suggestions {
+  max-height: 280px;
+  overflow-y: auto;
+  margin-top: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
 .search-clear {
   position: absolute;
   right: 6px;

@@ -35,14 +35,16 @@
         <button class="tab-btn" data-tab="browse">Browse</button>
       </div>
       <div id="tab-search" class="tab-content active">
-        <div class="mode-pills" id="joinModePills">
-          <button class="mode-pill active" data-mode="karaoke">🎭 Karaoke</button>
-          <button class="mode-pill" data-mode="mtv">🎤 MTV</button>
-          <button class="mode-pill" data-mode="lyrics">📄 Lyrics</button>
-        </div>
-        <div class="search-wrap">
-          <input type="text" id="searchInput" placeholder="Search a song or artist…">
-          <button class="search-clear" id="joinSearchClear" title="Clear search">✕</button>
+        <div class="search-sticky-header">
+          <div class="mode-pills" id="joinModePills">
+            <button class="mode-pill active" data-mode="karaoke">🎭 Karaoke</button>
+            <button class="mode-pill" data-mode="mtv">🎤 MTV</button>
+            <button class="mode-pill" data-mode="lyrics">📄 Lyrics</button>
+          </div>
+          <div class="search-wrap">
+            <input type="text" id="searchInput" placeholder="Search a song or artist…">
+            <button class="search-clear" id="joinSearchClear" title="Clear search">✕</button>
+          </div>
         </div>
         <div id="results"></div>
       </div>

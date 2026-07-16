@@ -253,41 +253,18 @@ h1, h2, .marquee {
   padding: 24px 20px 60px;
 }
 .container-join {
-  height: 100vh;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  padding-bottom: 0;
+  padding-bottom: 60px;
 }
-.container-join .brand { flex-shrink: 0; }
-.container-join > .card { flex-shrink: 0; }
-#joinSearchCard {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+.search-sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--surface);
+  padding-bottom: 12px;
+  margin-bottom: 4px;
 }
-#joinSearchCard .tab-content.active {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-#tab-search {
-  overflow: hidden;
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-#browseList { overflow-y: auto; }
-.mode-pills, .search-wrap { flex-shrink: 0; }
-#tab-search .search-wrap { margin-bottom: 12px; }
-#joinNowPlayingCard { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
-#joinSetlistCard { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 #results {
-  flex: 1;
-  min-height: 0;
+  max-height: 420px;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;

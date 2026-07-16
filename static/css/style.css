@@ -255,6 +255,10 @@ h1, h2, .marquee {
 .container-join {
   padding-bottom: 60px;
 }
+.container-join.searching .brand,
+.container-join.searching > .card:not(#joinSearchCard) {
+  display: none;
+}
 .search-sticky-header {
   position: sticky;
   top: 0;

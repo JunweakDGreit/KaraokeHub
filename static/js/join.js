@@ -37,7 +37,9 @@ function updateJoinSearchUI(active) {
   joinSearchClear.classList.toggle('visible', active);
   joinNowPlayingCard.style.display = active ? 'none' : '';
   joinSetlistCard.style.display = active ? 'none' : '';
-  results.style.maxHeight = active ? '520px' : '420px';
+  const headerH = document.querySelector('#joinSearchCard .search-sticky-header')?.offsetHeight || 90;
+  results.style.maxHeight = active ? `calc(100vh - ${headerH + 32}px)` : '420px';
+  document.querySelector('.container-join').classList.toggle('searching', active);
 }
 
 document.querySelectorAll('#joinModePills .mode-pill').forEach(pill => {

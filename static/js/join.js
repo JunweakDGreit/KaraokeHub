@@ -26,8 +26,19 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
 // --- Search ---
 const searchInput = document.getElementById('searchInput');
+const joinSearchClear = document.getElementById('joinSearchClear');
+const joinNowPlayingCard = document.getElementById('joinNowPlayingCard');
+const joinSetlistCard = document.getElementById('joinSetlistCard');
+const results = document.getElementById('results');
 let debounceTimer;
 let searchMode = "karaoke";
+
+function updateJoinSearchUI(active) {
+  joinSearchClear.classList.toggle('visible', active);
+  joinNowPlayingCard.style.display = active ? 'none' : '';
+  joinSetlistCard.style.display = active ? 'none' : '';
+  results.style.maxHeight = active ? '500px' : '260px';
+}
 
 document.querySelectorAll('#joinModePills .mode-pill').forEach(pill => {
   pill.addEventListener('click', function () {
@@ -41,8 +52,16 @@ document.querySelectorAll('#joinModePills .mode-pill').forEach(pill => {
 searchInput.addEventListener('input', () => {
   clearTimeout(debounceTimer);
   const q = searchInput.value.trim();
-  if (!q) { document.getElementById('results').innerHTML = ''; return; }
+  updateJoinSearchUI(!!q);
+  if (!q) { results.innerHTML = ''; return; }
   debounceTimer = setTimeout(() => runSearch(q), 350);
+});
+
+joinSearchClear.addEventListener('click', () => {
+  searchInput.value = '';
+  results.innerHTML = '';
+  updateJoinSearchUI(false);
+  searchInput.focus();
 });
 
 async function runSearch(q) {

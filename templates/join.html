@@ -40,7 +40,10 @@
           <button class="mode-pill" data-mode="mtv">🎤 MTV</button>
           <button class="mode-pill" data-mode="lyrics">📄 Lyrics</button>
         </div>
-        <input type="text" id="searchInput" placeholder="Search a song or artist…" style="margin-bottom:12px;">
+        <div class="search-wrap">
+          <input type="text" id="searchInput" placeholder="Search a song or artist…">
+          <button class="search-clear" id="joinSearchClear" title="Clear search">✕</button>
+        </div>
         <div id="results" style="max-height:260px; overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--line) transparent;"></div>
       </div>
       <div id="tab-browse" class="tab-content">
@@ -48,7 +51,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="joinNowPlayingCard">
       <h2 style="margin-top:0; font-size:14px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px;">Now Playing</h2>
       <div id="joinNowPlayingInfo" class="empty-state">Nothing playing</div>
       <div class="guest-controls" id="guestControls" style="display:none; gap:8px; margin-top:10px;">
@@ -57,7 +60,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="joinSetlistCard">
       <h2 style="margin-top:0; font-size:14px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px;">Set list</h2>
       <div id="queueList" class="empty-state">No songs queued yet — search or browse above to add one.</div>
     </div>

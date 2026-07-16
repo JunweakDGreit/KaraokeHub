@@ -372,6 +372,10 @@ input[type="text"].sink {
   font-size: 13px;
   padding: 10px 34px 10px 12px !important;
 }
+#searchInput {
+  padding-right: 34px !important;
+  margin-bottom: 12px !important;
+}
 .search-clear {
   position: absolute;
   right: 6px;

@@ -147,6 +147,7 @@ function renderQueue(queue) {
   el.className = '';
   el.innerHTML = queue.map((item, i) => `
     <div class="setlist-item" draggable="true"
+         ondblclick="handleQueueDblClick(event, ${i})"
          ondragstart="handleDragStart(event, ${i})"
          ondragend="handleDragEnd(event)"
          ondragover="handleDragOver(event)"
@@ -201,6 +202,39 @@ async function handleDrop(e, toIdx) {
     body: JSON.stringify({ from_index: dragSourceIdx, to_index: toIdx })
   });
   dragSourceIdx = null;
+}
+
+let contextMenuEl = null;
+
+function handleQueueDblClick(e, idx) {
+  e.stopPropagation();
+  closeContextMenu();
+  const menu = document.createElement('div');
+  menu.className = 'queue-context-menu';
+  menu.innerHTML = '<button onclick="playNext(event)">▶ Play Next</button>';
+  menu.style.left = Math.min(e.clientX, window.innerWidth - 156) + 'px';
+  menu.style.top = Math.min(e.clientY, window.innerHeight - 50) + 'px';
+  menu._queueIdx = idx;
+  document.body.appendChild(menu);
+  contextMenuEl = menu;
+  setTimeout(() => document.addEventListener('click', closeContextMenu, { once: true }), 0);
+}
+
+function closeContextMenu() {
+  if (contextMenuEl) { contextMenuEl.remove(); contextMenuEl = null; }
+}
+
+async function playNext(e) {
+  if (!contextMenuEl) return;
+  const idx = contextMenuEl._queueIdx;
+  closeContextMenu();
+  e.stopPropagation();
+  if (idx <= 0) return;
+  await fetch(`/api/rooms/${CODE}/queue/reorder`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from_index: idx, to_index: 0 })
+  });
 }
 
 fetch(`/api/rooms/${CODE}`).then(r => r.json()).then(data => {

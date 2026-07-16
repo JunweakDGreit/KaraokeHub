@@ -919,6 +919,36 @@ input[type="text"].sink {
 .back-drives { color: var(--gold); font-size: 12px; padding: 6px 8px; cursor: pointer; border-radius: 6px; margin-bottom: 4px; }
 .back-drives:hover { background: var(--surface-raised); }
 
+/* Queue context menu */
+.queue-context-menu {
+  position: fixed;
+  z-index: 2000;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 4px;
+  min-width: 150px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+  animation: fadeUp 0.15s ease;
+}
+.queue-context-menu button {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: none;
+  color: var(--text);
+  font-size: 13px;
+  font-family: 'Manrope', sans-serif;
+  cursor: pointer;
+  text-align: left;
+  border-radius: 8px;
+  transition: background 0.1s ease;
+}
+.queue-context-menu button:hover {
+  background: var(--pink);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .now-playing .pulse { animation: none; }
 }

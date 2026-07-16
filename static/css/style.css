@@ -568,6 +568,23 @@ input[type="text"].sink {
   color: var(--pink);
   font-weight: 600;
 }
+.room-expired-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--line);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+.room-card.expired {
+  opacity: 0.55;
+}
+.room-card.expired .room-code {
+  color: var(--muted);
+}
 .room-arrow {
   font-size: 11px;
   color: var(--muted);

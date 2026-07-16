@@ -39,7 +39,7 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 # In-memory room/queue state (persisted to disk for crash recovery)
 # ---------------------------------------------------------------------------
 rooms = {}  # code -> {created_at, queue: [...], now_playing: {...} | None, next_item_id, paused}
-ROOM_TIMEOUT_SECONDS = 4 * 60 * 60
+ROOM_TIMEOUT_SECONDS = 7 * 24 * 60 * 60
 
 
 def save_rooms():
@@ -48,6 +48,8 @@ def save_rooms():
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
         with open(ROOMS_CACHE_PATH, "w") as f:
             json.dump(rooms, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
     except Exception as e:
         print(f"[save_rooms] {e}")
 
@@ -62,9 +64,9 @@ def load_rooms():
         now = time.time()
         loaded = 0
         for code, room in data.items():
-            if now - room.get("created_at", 0) > ROOM_TIMEOUT_SECONDS:
-                continue
+            expired = now - room.get("created_at", 0) > ROOM_TIMEOUT_SECONDS
             room.setdefault("paused", False)
+            room["expired"] = expired
             rooms[code] = room
             loaded += 1
         if loaded:
@@ -226,7 +228,6 @@ def search_youtube(query: str, limit: int = 5, suffix: str = ""):
 # ---------------------------------------------------------------------------
 @app.route("/")
 def index():
-    cleanup_stale_rooms()
     room_list = sorted(rooms.items(), key=lambda x: x[1].get("created_at", 0), reverse=True)
     return render_template("index.html", room_list=room_list)
 

@@ -19,17 +19,20 @@
       <h2 style="margin-top:0; font-size:14px; color: var(--gold); text-transform: uppercase; letter-spacing: 1px;">&#9835; Previous Rooms</h2>
 
       {% for code, room in room_list %}
-      <div class="room-card">
+      <div class="room-card{% if room.expired %} expired{% endif %}">
         <div class="room-header" onclick="toggleRoom(this)">
           <div class="room-code">{{ code }}</div>
           <div class="room-meta">
             {% if room.now_playing %}
-              <span class="room-now-badge">&#9654; {{ room.now_playing.title }}</span>
+              <span class="room-now-badge">▶ {{ room.now_playing.title }}</span>
             {% else %}
               {{ room.queue|length }} song{% if room.queue|length != 1 %}s{% endif %}
             {% endif %}
+            {% if room.expired %}
+              <span class="room-expired-badge">Expired</span>
+            {% endif %}
           </div>
-          <span class="room-arrow">&#9654;</span>
+          <span class="room-arrow">▶</span>
         </div>
         <div class="room-queue">
           {% if room.queue %}

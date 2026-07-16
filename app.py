@@ -231,6 +231,11 @@ def index():
     return render_template("index.html", room_list=room_list)
 
 
+@app.route("/favicon.ico")
+def favicon():
+    return send_from_directory(BASE_DIR / "static", "favicon.ico")
+
+
 @app.route("/host/<code>")
 def host_page(code):
     if code not in rooms:

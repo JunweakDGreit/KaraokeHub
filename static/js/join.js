@@ -37,7 +37,6 @@ function updateJoinSearchUI(active) {
   joinSearchClear.classList.toggle('visible', active);
   joinNowPlayingCard.style.display = active ? 'none' : '';
   joinSetlistCard.style.display = active ? 'none' : '';
-  results.style.maxHeight = active ? '500px' : '260px';
 }
 
 document.querySelectorAll('#joinModePills .mode-pill').forEach(pill => {

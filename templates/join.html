@@ -9,7 +9,7 @@
   <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
 </head>
 <body>
-  <div class="container">
+  <div class="container container-join">
     <div class="brand">
       <h1 style="margin:0; font-size:22px;">Karaoke<span class="bulb">Hub</span></h1>
     </div>
@@ -29,7 +29,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="joinSearchCard">
       <div class="tabs">
         <button class="tab-btn active" data-tab="search">Search</button>
         <button class="tab-btn" data-tab="browse">Browse</button>
@@ -44,7 +44,7 @@
           <input type="text" id="searchInput" placeholder="Search a song or artist…">
           <button class="search-clear" id="joinSearchClear" title="Clear search">✕</button>
         </div>
-        <div id="results" style="max-height:260px; overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--line) transparent;"></div>
+        <div id="results"></div>
       </div>
       <div id="tab-browse" class="tab-content">
         <div id="browseList" class="empty-state">Loading library…</div>

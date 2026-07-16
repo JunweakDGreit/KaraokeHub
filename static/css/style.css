@@ -252,6 +252,46 @@ h1, h2, .marquee {
   margin: 0 auto;
   padding: 24px 20px 60px;
 }
+.container-join {
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+}
+.container-join .brand { flex-shrink: 0; }
+.container-join > .card { flex-shrink: 0; }
+#joinSearchCard {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+#joinSearchCard .tab-content.active {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+#tab-search {
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+#browseList { overflow-y: auto; }
+.mode-pills, .search-wrap { flex-shrink: 0; }
+#tab-search .search-wrap { margin-bottom: 12px; }
+#joinNowPlayingCard { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+#joinSetlistCard { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+#results {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
 
 .brand {
   display: flex;
@@ -374,7 +414,6 @@ input[type="text"].sink {
 }
 #searchInput {
   padding-right: 34px !important;
-  margin-bottom: 12px !important;
 }
 .search-clear {
   position: absolute;

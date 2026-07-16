@@ -91,8 +91,8 @@ exit /b 0
 
 :start_server
 echo(
-echo Starting server...
-start "KaraokeHub" /MIN venv\Scripts\python app.py --browser=!BROWSER_MODE!
+echo Starting server in background...
+powershell -NoProfile -Command "Start-Process -FilePath 'venv\Scripts\python.exe' -ArgumentList 'app.py','--browser=!BROWSER_MODE!' -WindowStyle Hidden"
 
 echo Waiting for server to be ready...
 set "WAIT_COUNT=0"
@@ -103,7 +103,7 @@ if not errorlevel 1 goto server_ready
 set /a WAIT_COUNT+=2
 if !WAIT_COUNT! geq 20 (
     echo Server failed to start within 20s.
-    echo Check the minimized KaraokeHub window for errors.
+    echo Check that Python and dependencies are installed correctly.
     pause
     exit /b 1
 )

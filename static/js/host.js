@@ -160,29 +160,63 @@ function escapeHtml(str) {
 
 // --- Host search ---
 const hostSearch = document.getElementById('hostSearch');
+const hostSearchClear = document.getElementById('hostSearchClear');
+const hostSearchResults = document.getElementById('hostSearchResults');
+const setlistSection = document.getElementById('setlistSection');
 let hostSearchTimer;
+
+function updateSearchUI(active) {
+  hostSearchClear.classList.toggle('visible', active);
+  if (active) {
+    setlistSection.classList.add('hidden');
+    hostSearchResults.style.maxHeight = '400px';
+  } else {
+    setlistSection.classList.remove('hidden');
+    hostSearchResults.style.maxHeight = '150px';
+  }
+}
+
 hostSearch.addEventListener('input', () => {
   clearTimeout(hostSearchTimer);
   const q = hostSearch.value.trim();
   document.getElementById('suggestions').innerHTML = '';
+  updateSearchUI(!!q);
   if (!q) {
-    document.getElementById('hostSearchResults').innerHTML = '';
+    hostSearchResults.innerHTML = '';
     checkIdleState();
     return;
   }
   hostSearchTimer = setTimeout(() => runHostSearch(q), 300);
 });
 
+hostSearchClear.addEventListener('click', () => {
+  hostSearch.value = '';
+  hostSearchResults.innerHTML = '';
+  updateSearchUI(false);
+  checkIdleState();
+  hostSearch.focus();
+});
+
 const idleSearch = document.getElementById('idleSearch');
+const idleSearchClear = document.getElementById('idleSearchClear');
 let idleSearchTimer;
+
 idleSearch.addEventListener('input', () => {
   clearTimeout(idleSearchTimer);
   const q = idleSearch.value.trim();
+  idleSearchClear.classList.toggle('visible', !!q);
   if (!q) {
     document.getElementById('idleSearchResults').innerHTML = '';
     return;
   }
   idleSearchTimer = setTimeout(() => runHostSearch(q, 'idleSearchResults'), 300);
+});
+
+idleSearchClear.addEventListener('click', () => {
+  idleSearch.value = '';
+  document.getElementById('idleSearchResults').innerHTML = '';
+  idleSearchClear.classList.remove('visible');
+  idleSearch.focus();
 });
 
 async function runHostSearch(q, targetId) {

@@ -43,7 +43,10 @@
             <button class="mode-pill" data-mode="mtv">🎤 MTV</button>
             <button class="mode-pill" data-mode="lyrics">📄 Lyrics</button>
           </div>
-          <input type="text" id="idleSearch" placeholder="Search songs…" autocomplete="off">
+          <div class="search-wrap">
+            <input type="text" id="idleSearch" placeholder="Search songs…" autocomplete="off">
+            <button class="search-clear" id="idleSearchClear" title="Clear search">✕</button>
+          </div>
           <div id="idleSearchResults" style="margin-top:8px; max-height:200px; overflow-y:auto; text-align:left;"></div>
         </div>
       </div>
@@ -99,12 +102,15 @@
           <button class="mode-pill" data-mode="mtv">🎤 MTV</button>
           <button class="mode-pill" data-mode="lyrics">📄 Lyrics</button>
         </div>
-        <input type="text" id="hostSearch" placeholder="Search songs…" style="font-size:13px; padding:10px 12px;">
+        <div class="search-wrap">
+          <input type="text" id="hostSearch" placeholder="Search songs…" style="font-size:13px;">
+          <button class="search-clear" id="hostSearchClear" title="Clear search">✕</button>
+        </div>
         <div id="hostSearchResults" style="max-height:150px; overflow-y:auto; margin-top:4px;"></div>
         <div id="suggestions" style="max-height:180px; overflow-y:auto; margin-top:4px;"></div>
       </div>
 
-      <div class="sidebar-section" style="flex:1; display:flex; flex-direction:column; min-height:0;">
+      <div class="sidebar-section" id="setlistSection" style="flex:1; display:flex; flex-direction:column; min-height:0;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
           <h2 style="margin:0; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:1px;">Set list</h2>
         </div>

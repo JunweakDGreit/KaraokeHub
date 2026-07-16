@@ -116,9 +116,4 @@ if "!BROWSER_MODE!"=="brave" (
 ) else (
     start "" http://localhost:5000
 )
-
-echo(
-echo KaraokeHub is running at http://localhost:5000
-echo Close this window when done.
-echo(
-pause
+exit

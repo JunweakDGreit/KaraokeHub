@@ -186,7 +186,7 @@ hostSearch.addEventListener('input', () => {
     checkIdleState();
     return;
   }
-  hostSearchTimer = setTimeout(() => runHostSearch(q), 300);
+  hostSearchTimer = setTimeout(() => runHostSearch(q), 500);
 });
 
 hostSearchClear.addEventListener('click', () => {
@@ -209,7 +209,7 @@ idleSearch.addEventListener('input', () => {
     document.getElementById('idleSearchResults').innerHTML = '';
     return;
   }
-  idleSearchTimer = setTimeout(() => runHostSearch(q, 'idleSearchResults'), 300);
+  idleSearchTimer = setTimeout(() => runHostSearch(q, 'idleSearchResults'), 500);
 });
 
 idleSearchClear.addEventListener('click', () => {

@@ -62,7 +62,7 @@ searchInput.addEventListener('input', () => {
   const q = searchInput.value.trim();
   updateJoinSearchUI(!!q);
   if (!q) { results.innerHTML = ''; return; }
-  debounceTimer = setTimeout(() => runSearch(q), 350);
+  debounceTimer = setTimeout(() => runSearch(q), 500);
 });
 
 joinSearchClear.addEventListener('click', () => {

@@ -233,6 +233,8 @@ html, body {
   font-size: 13px;
   text-align: center;
   padding: 8px 0;
+  font-style: italic;
+  opacity: 0.7;
 }
 .queue-scroll {
   scrollbar-width: thin;
@@ -389,6 +391,12 @@ input[type="text"].sink {
   letter-spacing: 2px;
   margin-bottom: 4px;
 }
+.ticket .label::before {
+  content: "\25CF  ";
+  color: var(--gold);
+  font-size: 8px;
+  vertical-align: middle;
+}
 .ticket .code {
   font-family: 'Space Mono', monospace;
   font-weight: 700;
@@ -421,9 +429,14 @@ input[type="text"].sink {
 .hint {
   text-align: center;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 13px;
   margin-top: 12px;
-  word-break: break-all;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  font-style: italic;
+  opacity: 0.85;
 }
 
 /* Landing page — previous rooms */
@@ -739,8 +752,10 @@ input[type="text"].sink {
 .empty-state {
   text-align: center;
   color: var(--muted);
-  padding: 30px 10px;
-  font-size: 14px;
+  padding: 24px 10px;
+  font-size: 13px;
+  font-style: italic;
+  opacity: 0.75;
 }
 
 .progress-bar {

@@ -296,6 +296,7 @@ function checkIdleState() {
   }
   document.getElementById('modePills').classList.toggle('hidden', idle);
   document.getElementById('hostSearch').classList.toggle('sink', idle);
+  updateSidebarIcon();
 }
 
 async function fetchSuggestions() {
@@ -569,8 +570,14 @@ async function scanFolder(path, name) {
 }
 
 // --- Sidebar toggle ---
+function updateSidebarIcon() {
+  const collapsed = document.querySelector('.dash-sidebar').classList.contains('collapsed');
+  document.getElementById('toggleSidebar').classList.toggle('sidebar-closed', collapsed);
+}
+
 document.getElementById('toggleSidebar').addEventListener('click', () => {
   document.querySelector('.dash-sidebar').classList.toggle('collapsed');
+  updateSidebarIcon();
 });
 
 document.getElementById('newRoomBtn').addEventListener('click', async () => {

@@ -255,9 +255,25 @@ h1, h2, .marquee {
 .container-join {
   padding-bottom: 60px;
 }
+.container-join .brand {
+  overflow: hidden;
+  max-height: 100px;
+  transition: opacity 0.25s ease, max-height 0.3s ease, margin-bottom 0.3s ease;
+}
+.container-join > .card:not(#joinSearchCard) {
+  overflow: hidden;
+  max-height: 800px;
+  transition: opacity 0.25s ease, max-height 0.35s ease, margin 0.3s ease, padding 0.3s ease, border-width 0.3s ease;
+}
 .container-join.searching .brand,
 .container-join.searching > .card:not(#joinSearchCard) {
-  display: none;
+  opacity: 0;
+  max-height: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-width: 0;
 }
 .search-sticky-header {
   position: sticky;
@@ -266,12 +282,23 @@ h1, h2, .marquee {
   background: var(--surface);
   padding-bottom: 12px;
   margin-bottom: 4px;
+  transition: margin-top 0.3s ease;
+}
+.container-join.searching .search-sticky-header {
+  margin-top: 12px;
+}
+#joinSearchCard {
+  transition: margin-top 0.3s ease;
+}
+.container-join.searching #joinSearchCard {
+  margin-top: -8px;
 }
 #results {
   max-height: 420px;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
+  transition: max-height 0.3s ease;
 }
 
 .brand {

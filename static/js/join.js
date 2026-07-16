@@ -40,6 +40,12 @@ function updateJoinSearchUI(active) {
   const headerH = document.querySelector('#joinSearchCard .search-sticky-header')?.offsetHeight || 90;
   results.style.maxHeight = active ? `calc(100vh - ${headerH + 32}px)` : '420px';
   document.querySelector('.container-join').classList.toggle('searching', active);
+  if (active) {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  setTimeout(() => {
+    if (active) results.style.maxHeight = `calc(100vh - ${headerH + 32}px)`;
+  }, 50);
 }
 
 document.querySelectorAll('#joinModePills .mode-pill').forEach(pill => {

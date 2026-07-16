@@ -90,12 +90,40 @@ function renderResults(results) {
         <div class="result-title">${escapeHtml(r.title)}</div>
         <div class="result-artist">${escapeHtml(r.artist || '')} <span class="tag ${r.source === 'youtube' ? 'tag-youtube' : 'tag-local'}">${r.source}</span></div>
       </div>
-      <button class="add-btn" onclick='addToQueue(${JSON.stringify(r).replace(/'/g, "&#39;")})'>+</button>
+      <button class="add-btn" onclick='addToQueue(this, ${JSON.stringify(r).replace(/'/g, "&#39;")})'>+</button>
     </div>
   `).join('');
 }
 
-async function addToQueue(song) {
+function flyToQueue(btn, song) {
+  const ql = document.getElementById('queueList');
+  if (!ql) return;
+  const dest = ql.getBoundingClientRect();
+  if (dest.width === 0 || dest.height === 0) return;
+  const srcRect = btn.getBoundingClientRect();
+  const lastItem = ql.querySelector('.setlist-item:last-child');
+  const destRect = lastItem ? lastItem.getBoundingClientRect() : dest;
+  const destTop = lastItem ? destRect.bottom + 4 : destRect.top + 8;
+  const destLeft = lastItem ? destRect.left : destRect.left + 8;
+
+  const fly = document.createElement('div');
+  fly.className = 'fly-clone';
+  fly.innerHTML = `<div style="display:flex;align-items:center;gap:10px;"><div style="font-family:'Space Mono',monospace;color:var(--muted);font-size:12px;width:18px;flex-shrink:0;">#</div><div style="flex:1;min-width:0;"><div style="font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(song.title)}</div><div style="font-size:10px;color:var(--muted);">${escapeHtml(song.artist || '')}</div></div></div>`;
+  fly.style.left = (srcRect.left - 10) + 'px';
+  fly.style.top = srcRect.top + 'px';
+  fly.style.width = '180px';
+  document.body.appendChild(fly);
+
+  requestAnimationFrame(() => {
+    fly.style.transform = `translate(${destLeft - (srcRect.left - 10)}px, ${destTop - srcRect.top}px) scale(0.85)`;
+    fly.style.opacity = '0.5';
+  });
+
+  fly.addEventListener('transitionend', () => fly.remove(), { once: true });
+}
+
+async function addToQueue(btn, song) {
+  flyToQueue(btn, song);
   await fetch(`/api/rooms/${CODE}/queue`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -137,7 +165,7 @@ function renderBrowse(songs, el) {
       ${grouped[artist].map(s => `
         <div class="browse-song">
           <span class="browse-song-title">${escapeHtml(s.title)}</span>
-          <button class="add-btn-sm" onclick='addToQueue(${JSON.stringify({id: s.id, title: s.title, artist: s.artist, source: "local", source_ref: s.filepath}).replace(/'/g, "&#39;")})'>+</button>
+          <button class="add-btn-sm" onclick='addToQueue(this, ${JSON.stringify({id: s.id, title: s.title, artist: s.artist, source: "local", source_ref: s.filepath}).replace(/'/g, "&#39;")})'>+</button>
         </div>
       `).join('')}
     </div>

@@ -50,7 +50,10 @@
       <div class="sidebar-section">
         <div class="ticket" style="padding:10px 14px;">
           <div>
-            <div class="label" style="font-size:10px;">Room</div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div class="label" style="font-size:10px;">Room</div>
+              <button class="btn btn-ghost" id="newRoomBtn" title="Create new room" style="font-size:10px; padding:2px 6px;">New</button>
+            </div>
             <div class="code" style="font-size:24px; letter-spacing:4px;">{{ code }}</div>
           </div>
           <div class="spotlight-ring" style="padding:6px; border-radius:10px;">
@@ -61,6 +64,15 @@
 
       <div class="sidebar-section" id="nowPlayingBar">
         <div id="nowPlayingInfo" class="np-info-empty">Nothing playing</div>
+        <div id="progressBar" class="progress-bar" style="display:none;">
+          <div class="progress-track" id="progressTrack">
+            <div id="progressFill" class="progress-fill"></div>
+          </div>
+          <div class="progress-times">
+            <span id="currentTime">0:00</span>
+            <span id="totalTime">0:00</span>
+          </div>
+        </div>
         <div class="host-controls" style="margin-top:8px;">
           <button class="btn btn-secondary" id="playPauseBtn" style="flex:1; font-size:12px; padding:8px;">▶ Play</button>
           <button class="btn btn-primary" id="playNextBtn" style="flex:1; font-size:12px; padding:8px;">⏭ Next</button>

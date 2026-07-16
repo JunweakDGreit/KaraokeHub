@@ -6,3 +6,4 @@ __pycache__/
 stdout*.txt
 stderr*.txt
 bin/
+cache/

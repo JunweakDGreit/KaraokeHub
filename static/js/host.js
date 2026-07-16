@@ -112,6 +112,7 @@ function playMedia(item) {
     idle.classList.add('active');
     info.className = 'np-info-empty';
     info.textContent = 'Nothing playing';
+    document.getElementById('progressBar').style.display = 'none';
     checkIdleState();
     return;
   }
@@ -120,6 +121,10 @@ function playMedia(item) {
   idle.classList.remove('active');
   container.classList.add('active');
   checkIdleState();
+  document.getElementById('progressBar').style.display = 'block';
+  document.getElementById('progressFill').style.width = '0%';
+  document.getElementById('currentTime').textContent = '0:00';
+  document.getElementById('totalTime').textContent = '0:00';
 
   info.className = 'now-playing';
   info.innerHTML = `
@@ -390,6 +395,31 @@ document.getElementById('pauseOverlay').addEventListener('click', () => {
   }
 });
 
+// --- Progress bar ---
+function fmtTime(sec) {
+  if (!isFinite(sec) || sec < 0) return '0:00';
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+document.getElementById('videoPlayer').addEventListener('timeupdate', () => {
+  const video = document.getElementById('videoPlayer');
+  if (!video.duration) return;
+  const pct = (video.currentTime / video.duration) * 100;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('currentTime').textContent = fmtTime(video.currentTime);
+  document.getElementById('totalTime').textContent = fmtTime(video.duration);
+});
+
+document.getElementById('progressTrack').addEventListener('click', (e) => {
+  const video = document.getElementById('videoPlayer');
+  if (!video.duration) return;
+  const rect = e.currentTarget.getBoundingClientRect();
+  const pct = (e.clientX - rect.left) / rect.width;
+  video.currentTime = pct * video.duration;
+});
+
 // --- Vocal reduction toggle ---
 const vocalToggle = document.getElementById('vocalToggle');
 
@@ -541,6 +571,13 @@ async function scanFolder(path, name) {
 // --- Sidebar toggle ---
 document.getElementById('toggleSidebar').addEventListener('click', () => {
   document.querySelector('.dash-sidebar').classList.toggle('collapsed');
+});
+
+document.getElementById('newRoomBtn').addEventListener('click', async () => {
+  if (!confirm('Create a new room? This keeps the current room.')) return;
+  const res = await fetch('/api/rooms/create', { method: 'POST' });
+  const data = await res.json();
+  if (data.code) window.location.href = `/host/${data.code}`;
 });
 
 // initial load

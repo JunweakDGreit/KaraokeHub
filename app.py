@@ -4,6 +4,7 @@ Host runs this on a laptop. Guests join from phone/laptop on the same WiFi.
 """
 import os
 import re
+import json
 import time
 import socket
 import sqlite3
@@ -26,6 +27,8 @@ from flask_socketio import SocketIO, join_room as socket_join_room, emit
 BASE_DIR = Path(__file__).parent
 LIBRARY_DIR = BASE_DIR / "library"
 DB_PATH = BASE_DIR / "library.db"
+CACHE_DIR = BASE_DIR / "cache"
+ROOMS_CACHE_PATH = CACHE_DIR / "rooms.json"
 SUPPORTED_EXT = {".mp3", ".mp4", ".cdg", ".m4a", ".wav", ".webm"}
 
 app = Flask(__name__)
@@ -33,10 +36,41 @@ app.config["SECRET_KEY"] = "karaokehub-dev-secret"
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # ---------------------------------------------------------------------------
-# In-memory room/queue state (ephemeral, matches ARCHITECTURE.md section 6)
+# In-memory room/queue state (persisted to disk for crash recovery)
 # ---------------------------------------------------------------------------
-rooms = {}  # code -> {created_at, queue: [...], now_playing: {...} | None, next_item_id}
+rooms = {}  # code -> {created_at, queue: [...], now_playing: {...} | None, next_item_id, paused}
 ROOM_TIMEOUT_SECONDS = 4 * 60 * 60
+
+
+def save_rooms():
+    """Persist all room state to disk so playlists survive restarts."""
+    try:
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        with open(ROOMS_CACHE_PATH, "w") as f:
+            json.dump(rooms, f, indent=2)
+    except Exception as e:
+        print(f"[save_rooms] {e}")
+
+
+def load_rooms():
+    """Restore room state from disk on startup."""
+    if not ROOMS_CACHE_PATH.is_file():
+        return
+    try:
+        with open(ROOMS_CACHE_PATH, "r") as f:
+            data = json.load(f)
+        now = time.time()
+        loaded = 0
+        for code, room in data.items():
+            if now - room.get("created_at", 0) > ROOM_TIMEOUT_SECONDS:
+                continue
+            room.setdefault("paused", False)
+            rooms[code] = room
+            loaded += 1
+        if loaded:
+            print(f"[load_rooms] restored {loaded} room(s)")
+    except Exception as e:
+        print(f"[load_rooms] {e}")
 
 
 def get_local_ip():
@@ -192,7 +226,9 @@ def search_youtube(query: str, limit: int = 5, suffix: str = ""):
 # ---------------------------------------------------------------------------
 @app.route("/")
 def index():
-    return render_template("index.html")
+    cleanup_stale_rooms()
+    room_list = sorted(rooms.items(), key=lambda x: x[1].get("created_at", 0), reverse=True)
+    return render_template("index.html", room_list=room_list)
 
 
 @app.route("/host/<code>")
@@ -221,7 +257,8 @@ def create_room():
     cleanup_stale_rooms()
     code = generate_room_code()
     rooms[code] = {"created_at": time.time(), "queue": [], "now_playing": None,
-                    "next_item_id": 1}
+                    "next_item_id": 1, "paused": False}
+    save_rooms()
     local_ip = get_local_ip()
     join_url = f"http://{local_ip}:5000/join/{code}"
     return jsonify({"code": code, "join_url": join_url})
@@ -373,6 +410,7 @@ def advance_queue(room, code):
         room["now_playing"] = None
         socketio.emit("now_playing_update", {"now_playing": None}, to=code)
         socketio.emit("queue_update", {"queue": []}, to=code)
+        save_rooms()
         return None
 
     item = room["queue"].pop(0)
@@ -395,6 +433,7 @@ def advance_queue(room, code):
     socketio.emit("queue_update", {"queue": room["queue"]}, to=code)
     socketio.emit("now_playing_update", {"now_playing": item}, to=code)
     socketio.emit("playback_update", {"paused": False}, to=code)
+    save_rooms()
     return item
 
 
@@ -605,6 +644,7 @@ def add_to_queue(code):
     else:
         socketio.emit("queue_update", {"queue": room["queue"]}, to=code)
 
+    save_rooms()
     return jsonify({"ok": True, "item": item})
 
 
@@ -615,6 +655,7 @@ def remove_from_queue(code, item_id):
         return jsonify({"error": "room not found"}), 404
     room["queue"] = [i for i in room["queue"] if i["item_id"] != item_id]
     socketio.emit("queue_update", {"queue": room["queue"]}, to=code)
+    save_rooms()
     return jsonify({"ok": True})
 
 
@@ -634,6 +675,7 @@ def reorder_queue(code):
     item = q.pop(from_index)
     q.insert(to_index, item)
     socketio.emit("queue_update", {"queue": q}, to=code)
+    save_rooms()
     return jsonify({"ok": True})
 
 
@@ -655,6 +697,7 @@ def playpause(code):
     paused = data.get("paused", False)
     room["paused"] = paused
     socketio.emit("playback_update", {"paused": paused}, to=code)
+    save_rooms()
     return jsonify({"ok": True})
 
 
@@ -704,6 +747,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     init_db()
+    load_rooms()
     scan_library()
     ip = get_local_ip()
     print(f"\nKaraokeHub running.\n  On this laptop:  http://localhost:5000\n  On phones (same WiFi): http://{ip}:5000\n")

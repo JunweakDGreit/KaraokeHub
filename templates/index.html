@@ -12,6 +12,47 @@
       <h1 style="margin:0; font-size:26px;">Karaoke<span class="bulb">Hub</span></h1>
     </div>
 
+    {% if room_list %}
+    <div class="card">
+      <h2 style="margin-top:0; font-size:14px; color: var(--gold); text-transform: uppercase; letter-spacing: 1px;">&#9835; Previous Rooms</h2>
+
+      {% for code, room in room_list %}
+      <div class="room-card">
+        <div class="room-header" onclick="toggleRoom(this)">
+          <div class="room-code">{{ code }}</div>
+          <div class="room-meta">
+            {% if room.now_playing %}
+              <span class="room-now-badge">&#9654; {{ room.now_playing.title }}</span>
+            {% else %}
+              {{ room.queue|length }} song{% if room.queue|length != 1 %}s{% endif %}
+            {% endif %}
+          </div>
+          <span class="room-arrow">&#9654;</span>
+        </div>
+        <div class="room-queue">
+          {% if room.queue %}
+          <div class="room-queue-scroll">
+            {% for item in room.queue %}
+            <div class="room-queue-item">
+              <span class="room-queue-num">{{ loop.index }}</span>
+              <div class="room-queue-info">
+                <div class="room-queue-title">{{ item.title }}</div>
+                <div class="room-queue-artist">{{ item.artist or 'Unknown' }} &middot; by {{ item.requested_by }}</div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="room-queue-footer">{{ room.queue|length }} song{% if room.queue|length != 1 %}s{% endif %} in queue</div>
+          {% else %}
+          <p class="empty-state" style="padding:10px; font-size:12px;">No songs in queue</p>
+          {% endif %}
+          <a href="/host/{{ code }}" class="btn btn-primary" style="font-size:13px; padding:10px;">Resume this room</a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
     <div class="card">
       <h2 style="margin-top:0; font-size:16px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px;">Start a night</h2>
       <button class="btn btn-primary" id="createBtn">Create a room</button>
@@ -39,6 +80,13 @@
     document.getElementById('codeInput').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') document.getElementById('joinBtn').click();
     });
+
+    function toggleRoom(header) {
+      const queue = header.nextElementSibling;
+      const arrow = header.querySelector('.room-arrow');
+      queue.classList.toggle('open');
+      arrow.innerHTML = queue.classList.contains('open') ? '&#9660;' : '&#9654;';
+    }
   </script>
 </body>
 </html>

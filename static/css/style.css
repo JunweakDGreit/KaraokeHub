@@ -262,18 +262,28 @@ h1, h2, .marquee {
 }
 .btn-primary:hover { filter: brightness(1.08); }
 .btn-secondary {
-  background: transparent;
+  background: var(--surface);
   color: var(--text);
   border: 1.5px solid var(--line);
+  transition: all 0.2s ease;
 }
-.btn-secondary:hover { border-color: var(--pink); }
+.btn-secondary:hover {
+  background: var(--surface-raised);
+  border-color: var(--pink);
+}
 .btn-ghost {
   background: transparent;
   color: var(--muted);
-  border: none;
+  border: 1px solid transparent;
   width: auto;
   padding: 8px 10px;
   font-size: 14px;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+.btn-ghost:hover {
+  color: var(--gold);
+  border-color: var(--line);
 }
 
 .btn-voice {
@@ -669,10 +679,16 @@ input[type="text"].sink {
   background: none;
   border: none;
   color: var(--muted);
-  font-size: 18px;
+  font-size: 16px;
   cursor: pointer;
+  border-radius: 6px;
+  padding: 2px 6px;
+  transition: all 0.15s ease;
 }
-.remove-btn:hover { color: var(--pink); }
+.remove-btn:hover {
+  color: var(--pink);
+  background: var(--surface-raised);
+}
 
 .now-playing {
   display: flex;

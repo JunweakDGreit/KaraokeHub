@@ -10,6 +10,7 @@ import socket
 import sqlite3
 import random
 import string
+import sys
 import subprocess
 import platform
 from urllib.parse import quote
@@ -93,6 +94,31 @@ def generate_room_code():
         code = "".join(random.choices(string.digits, k=4))
         if code not in rooms:
             return code
+
+
+def check_hardware_lock():
+    """Lock the app to its current volume so it refuses to run if copied."""
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+    lock_file = os.path.join(app_dir, ".hardware_lock")
+    current_serial = os.stat(app_dir).st_dev
+
+    if not os.path.exists(lock_file):
+        with open(lock_file, "w") as f:
+            f.write(str(current_serial))
+        print(f"  [lock] Hardware lock created — serial {current_serial}")
+        return True
+
+    with open(lock_file) as f:
+        authorized = int(f.read().strip())
+
+    if current_serial == authorized:
+        return True
+
+    print(f"\n  *** UNAUTHORIZED DRIVE — app won't run on this volume ***")
+    print(f"  Locked serial:  {authorized}")
+    print(f"  Current serial: {current_serial}")
+    print(f"\n  To re-authorize, delete the file:\n    {lock_file}")
+    return False
 
 
 def cleanup_stale_rooms():
@@ -746,6 +772,9 @@ def on_join(data):
 
 if __name__ == "__main__":
     import argparse
+
+    if not check_hardware_lock():
+        sys.exit(1)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--browser", choices=["brave", "default"], default=None,

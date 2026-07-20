@@ -9,7 +9,6 @@ import time
 import socket
 import sqlite3
 import random
-import hashlib
 import string
 import sys
 import subprocess
@@ -98,40 +97,27 @@ def generate_room_code():
 
 
 def check_hardware_lock():
-    """Two-factor lock: drive serial + license key in user home folder."""
+    """Lock the app to its current volume so it refuses to run if copied."""
     app_dir = os.path.dirname(os.path.abspath(__file__))
     lock_file = os.path.join(app_dir, ".hardware_lock")
-    key_file = os.path.join(os.path.expanduser("~"), ".karaokehub_key")
-
-    if not os.path.exists(key_file):
-        print("\n  *** NO LICENSE KEY ***")
-        print(f"  Expected at: {key_file}")
-        print("  Run 'python app.py --init' on the original machine to create one.")
-        print("  Then copy that file to the same path on other machines to authorize them.")
-        return False
-
-    with open(key_file) as f:
-        key = f.read().strip()
-
-    serial = os.stat(app_dir).st_dev
-    expected = hashlib.sha256(f"{serial}{key}".encode()).hexdigest()
+    current_serial = os.stat(app_dir).st_dev
 
     if not os.path.exists(lock_file):
         with open(lock_file, "w") as f:
-            f.write(expected)
-        print(f"  [lock] This drive authorized with existing license")
+            f.write(str(current_serial))
+        print(f"  [lock] Hardware lock created — serial {current_serial}")
         return True
 
     with open(lock_file) as f:
-        stored = f.read().strip()
+        authorized = int(f.read().strip())
 
-    if expected == stored:
+    if current_serial == authorized:
         return True
 
-    print(f"\n  *** UNAUTHORIZED DRIVE ***")
-    print(f"  Drive serial:   {serial}")
-    print(f"  Lock expected:  {stored[:16]}...")
-    print(f"  Current hash:   {expected[:16]}...")
+    print(f"\n  *** UNAUTHORIZED DRIVE — app won't run on this volume ***")
+    print(f"  Locked serial:  {authorized}")
+    print(f"  Current serial: {current_serial}")
+    print(f"\n  To re-authorize, delete the file:\n    {lock_file}")
     return False
 
 
@@ -787,25 +773,12 @@ def on_join(data):
 if __name__ == "__main__":
     import argparse
 
-    if "--init" in sys.argv:
-        key_file = os.path.join(os.path.expanduser("~"), ".karaokehub_key")
-        if os.path.exists(key_file):
-            print(f"License key already exists:\n  {key_file}\nDelete it first to re-init.")
-            sys.exit(1)
-        key = os.urandom(32).hex()
-        with open(key_file, "w") as f:
-            f.write(key)
-        print(f"License key created at:\n  {key_file}")
-        print("Keep this file secret. Copy it to ~/.karaokehub_key on other machines to run the app.")
-        sys.exit(0)
-
     if not check_hardware_lock():
         sys.exit(1)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--browser", choices=["brave", "default"], default=None,
                         help="Browser mode passed by launcher (handled externally)")
-    parser.add_argument("--init", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
 
     init_db()
